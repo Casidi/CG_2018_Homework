@@ -61,6 +61,7 @@ void idle(void);
 void draw_light_bulb(void);
 void camera_light_ball_move();
 GLuint loadTexture(char* name, GLfloat width, GLfloat height);
+void myDrawModel(GLMmodel model);
 
 namespace
 {
@@ -115,7 +116,10 @@ GLuint mainTextureID; // TA has already loaded this texture for you
 GLuint noiseTextureID; // TA has already loaded this texture for you
 GLuint rampTextureID; // TA has already loaded this texture for you
 
+GLuint phongProgramID;
+
 GLMmodel *model; //TA has already loaded the model for you(!but you still need to convert it to VBO(s)!)
+GLuint modelVAO;
 
 float eyex = 0.0;
 float eyey = 0.0;
@@ -131,7 +135,7 @@ int main(int argc, char *argv[])
 
 	glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGBA | GLUT_DEPTH);
 	// remember to replace "YourStudentID" with your own student ID
-	glutCreateWindow("CG_HW2_YourStudentID");
+	glutCreateWindow("CG_HW2_0756025");
 	glutReshapeWindow(512, 512);
 
 	glewInit();
@@ -157,7 +161,55 @@ void init(void)
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
 	glEnable(GL_CULL_FACE);
+
 	model = glmReadOBJ(obj_file_dir);
+
+	GLMgroup *group = model->groups;
+	int numVertices = 0;
+	while (group) {
+		numVertices += group->numtriangles * 3;
+		group = group->next;
+	}
+
+	Vertex *allVertices = new Vertex[numVertices];
+	group = model->groups;
+	#define T(x) (model->triangles[(x)])
+	while (group) {
+		for (int i = 0; i < group->numtriangles; ++i) {
+			GLMtriangle* triangle = &T(group->triangles[i]);
+			for (int j = 0; j < 3; ++j) {
+				for (int k = 0; k < 3; ++k) {
+					allVertices[i * 3 + j].position[k] = model->vertices[3 * triangle->vindices[j] + k];
+					allVertices[i * 3 + j].normal[k] = model->normals[3 * triangle->nindices[j] + k];
+				}
+				for (int k = 0; k < 2; ++k) {
+					allVertices[i * 3 + j].texcoord[k] = model->texcoords[2 * triangle->tindices[j] + k];
+				}
+			}
+		}
+		group = group->next;
+	}
+	
+	delete[] allVertices;
+
+	GLuint vbo_ids[2];
+	glGenBuffers(2, vbo_ids);
+	glBindBuffer(GL_ARRAY_BUFFER, vbo_ids[0]);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(GLfloat)*model->numvertices*3, model->vertices, GL_STATIC_DRAW);
+	glBindBuffer(GL_ARRAY_BUFFER, vbo_ids[1]);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(GLfloat)*model->numnormals * 3, model->normals, GL_STATIC_DRAW);
+
+
+	glGenVertexArrays(1, &modelVAO);
+	glBindVertexArray(modelVAO);
+
+	glEnableVertexAttribArray(0);
+	glEnableVertexAttribArray(1);
+
+	glBindBuffer(GL_ARRAY_BUFFER, vbo_ids[0]);
+	//glVertexAttribPointer(0, /* ... */);
+	glBindBuffer(GL_ARRAY_BUFFER, vbo_ids[1]);
+	//glVertexAttribPointer(1, /* ... */);
 
 	mainTextureID = loadTexture(main_tex_dir, 512, 256);
 	noiseTextureID = loadTexture(noise_tex_dir, 360, 360);
@@ -173,11 +225,10 @@ void init(void)
 
 	// APIs for creating shaders and creating shader programs have been done by TAs
 	// following is an example for creating a shader program using given vertex shader and fragment shader
-	/*
-	GLuint vert = createShader("Shaders/bump.vert", "vertex");
-	GLuint frag = createShader("Shaders/bump.frag", "fragment");
-	GLuint program = createProgram(vert, frag);
-	*/
+	
+	GLuint vert = createShader("Shaders/phong.vert", "vertex");
+	GLuint frag = createShader("Shaders/phong.frag", "fragment");
+	phongProgramID = createProgram(vert, frag);
 }
 
 void display(void)
@@ -207,8 +258,20 @@ void display(void)
 		glRotatef(ball_rot[2], 0, 0, 1);
 	// please try not to modify the previous block of code
 
+		
+		glUseProgram(phongProgramID);
+		GLfloat mtx[16];
+		glGetFloatv(GL_MODELVIEW_MATRIX, mtx);
+		GLint loc = glGetUniformLocation(phongProgramID, "ModelViewMatrix");
+		glUniformMatrix4fv(loc, 1, GL_FALSE, mtx);
+
+		glGetFloatv(GL_PROJECTION_MATRIX, mtx);
+		loc = glGetUniformLocation(phongProgramID, "ProjectionMatrix");
+		glUniformMatrix4fv(loc, 1, GL_FALSE, mtx);
+
 	// you may need to do something here(pass uniform variable(s) to shader and render the model)
 		glmDraw(model,GLM_TEXTURE);// please delete this line in your final code! It's just a preview of rendered object
+		glUseProgram(0);
 
 	glPopMatrix();
 
@@ -689,4 +752,7 @@ void idle(void)
 GLuint loadTexture(char* name, GLfloat width, GLfloat height)
 {
 	return glmLoadTexture(name, false, true, true, true, &width, &height);
+}
+
+void myDrawModel() {
 }
