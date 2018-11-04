@@ -41,6 +41,8 @@ extern "C"
 you may use the following struct type to perform your single VBO method,
 or you can define/declare multiple VBOs for VAO method.
 Please feel free to modify it*/
+#pragma pack(push)
+#pragma pack(1)
 struct Vertex
 {
 	GLfloat position[3];
@@ -48,6 +50,7 @@ struct Vertex
 	GLfloat texcoord[2];
 };
 typedef struct Vertex Vertex;
+#pragma pack(pop)
 
 //no need to modify the following function declarations and gloabal variables
 void init(void);
@@ -61,7 +64,7 @@ void idle(void);
 void draw_light_bulb(void);
 void camera_light_ball_move();
 GLuint loadTexture(char* name, GLfloat width, GLfloat height);
-void myDrawModel(GLMmodel model);
+void myDrawModel();
 
 namespace
 {
@@ -120,6 +123,7 @@ GLuint phongProgramID;
 
 GLMmodel *model; //TA has already loaded the model for you(!but you still need to convert it to VBO(s)!)
 GLuint modelVAO;
+int modelVertexNum;
 
 float eyex = 0.0;
 float eyey = 0.0;
@@ -170,6 +174,7 @@ void init(void)
 		numVertices += group->numtriangles * 3;
 		group = group->next;
 	}
+	modelVertexNum = numVertices;
 
 	Vertex *allVertices = new Vertex[numVertices];
 	group = model->groups;
@@ -190,26 +195,23 @@ void init(void)
 		group = group->next;
 	}
 	
+	GLuint vbo_id;
+	glGenBuffers(1, &vbo_id);
+	glBindBuffer(GL_ARRAY_BUFFER, vbo_id);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(Vertex)*numVertices, allVertices, GL_STATIC_DRAW);
 	delete[] allVertices;
-
-	GLuint vbo_ids[2];
-	glGenBuffers(2, vbo_ids);
-	glBindBuffer(GL_ARRAY_BUFFER, vbo_ids[0]);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(GLfloat)*model->numvertices*3, model->vertices, GL_STATIC_DRAW);
-	glBindBuffer(GL_ARRAY_BUFFER, vbo_ids[1]);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(GLfloat)*model->numnormals * 3, model->normals, GL_STATIC_DRAW);
-
 
 	glGenVertexArrays(1, &modelVAO);
 	glBindVertexArray(modelVAO);
 
 	glEnableVertexAttribArray(0);
 	glEnableVertexAttribArray(1);
+	glEnableVertexAttribArray(2);
 
-	glBindBuffer(GL_ARRAY_BUFFER, vbo_ids[0]);
-	//glVertexAttribPointer(0, /* ... */);
-	glBindBuffer(GL_ARRAY_BUFFER, vbo_ids[1]);
-	//glVertexAttribPointer(1, /* ... */);
+	glBindBuffer(GL_ARRAY_BUFFER, vbo_id);
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)0);
+	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)(3 * sizeof(GLfloat)));
+	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)(6 * sizeof(GLfloat)));
 
 	mainTextureID = loadTexture(main_tex_dir, 512, 256);
 	noiseTextureID = loadTexture(noise_tex_dir, 360, 360);
@@ -258,20 +260,52 @@ void display(void)
 		glRotatef(ball_rot[2], 0, 0, 1);
 	// please try not to modify the previous block of code
 
-		
+	// you may need to do something here(pass uniform variable(s) to shader and render the model)
+		//glmDraw(model,GLM_TEXTURE);// please delete this line in your final code! It's just a preview of rendered object
+		glPushMatrix();
+		glLoadIdentity();
+		gluLookAt(
+			eyex,
+			eyey,
+			eyez,
+			eyex + cos(eyet*M_PI / 180)*cos(eyep*M_PI / 180),
+			eyey + sin(eyet*M_PI / 180),
+			eyez - cos(eyet*M_PI / 180)*sin(eyep*M_PI / 180),
+			0.0,
+			1.0,
+			0.0);
 		glUseProgram(phongProgramID);
 		GLfloat mtx[16];
 		glGetFloatv(GL_MODELVIEW_MATRIX, mtx);
-		GLint loc = glGetUniformLocation(phongProgramID, "ModelViewMatrix");
+		GLint loc = glGetUniformLocation(phongProgramID, "viewMatrix");
+		glUniformMatrix4fv(loc, 1, GL_FALSE, mtx);
+
+		glLoadIdentity();
+		glTranslatef(ball_pos[0], ball_pos[1], ball_pos[2]);
+		glRotatef(ball_rot[0], 1, 0, 0);
+		glRotatef(ball_rot[1], 0, 1, 0);
+		glRotatef(ball_rot[2], 0, 0, 1);
+		glGetFloatv(GL_MODELVIEW_MATRIX, mtx);
+		loc = glGetUniformLocation(phongProgramID, "modelMatrix");
 		glUniformMatrix4fv(loc, 1, GL_FALSE, mtx);
 
 		glGetFloatv(GL_PROJECTION_MATRIX, mtx);
-		loc = glGetUniformLocation(phongProgramID, "ProjectionMatrix");
+		loc = glGetUniformLocation(phongProgramID, "projectionMatrix");
 		glUniformMatrix4fv(loc, 1, GL_FALSE, mtx);
 
-	// you may need to do something here(pass uniform variable(s) to shader and render the model)
-		glmDraw(model,GLM_TEXTURE);// please delete this line in your final code! It's just a preview of rendered object
+		loc = glGetUniformLocation(phongProgramID, "myTexture");
+		glUniform1i(loc, 0);
+
+		loc = glGetUniformLocation(phongProgramID, "lightPos");
+		glUniform3fv(loc, 1, light_pos);
+		loc = glGetUniformLocation(phongProgramID, "viewPos");
+		glUniform3f(loc, eyex, eyey, eyez);
+
+		glPopMatrix();
+
+		myDrawModel();
 		glUseProgram(0);
+		glmDraw(model, GLM_TEXTURE);
 
 	glPopMatrix();
 
@@ -755,4 +789,8 @@ GLuint loadTexture(char* name, GLfloat width, GLfloat height)
 }
 
 void myDrawModel() {
+	glBindTexture(GL_TEXTURE_2D, model->textures[0].id);
+	glBindVertexArray(modelVAO);
+	glDrawArrays(GL_TRIANGLES, 0, modelVertexNum);
+	glBindVertexArray(0);
 }

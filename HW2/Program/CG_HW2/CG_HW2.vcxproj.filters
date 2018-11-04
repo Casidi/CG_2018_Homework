@@ -46,5 +46,16 @@
     <Filter Include="glm">
       <UniqueIdentifier>{97e77f03-ba2c-49c4-82ae-8502d505c09d}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Shaders">
+      <UniqueIdentifier>{7347184f-ae4b-4b58-865f-70879fc6e5df}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Shaders\phong.frag">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="Shaders\phong.vert">
+      <Filter>Shaders</Filter>
+    </None>
   </ItemGroup>
 </Project>
