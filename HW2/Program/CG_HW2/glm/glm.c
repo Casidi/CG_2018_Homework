@@ -270,7 +270,7 @@ glmFindOrAddTexture(GLMmodel* model, const char* name)
        texture (0). */
     model->numtextures++;
     model->textures = (GLMtexture*)realloc(model->textures, sizeof(GLMtexture) * model->numtextures);
-    model->textures[model->numtextures - 1].name = strdup(name);
+    model->textures[model->numtextures - 1].name = _strdup(name);
     model->textures[model->numtextures - 1].id =
         glmLoadTexture(filename, GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE, &width, &height);
     model->textures[model->numtextures - 1].width = width;
