@@ -57,5 +57,17 @@
     <None Include="Shaders\phong.vert">
       <Filter>Shaders</Filter>
     </None>
+    <None Include="Shaders\dissolving.frag">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="Shaders\dissolving.vert">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="Shaders\ramp.frag">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="Shaders\ramp.vert">
+      <Filter>Shaders</Filter>
+    </None>
   </ItemGroup>
 </Project>

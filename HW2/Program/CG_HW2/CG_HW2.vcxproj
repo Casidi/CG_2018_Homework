@@ -136,8 +136,12 @@
     <ClInclude Include="glm_helper.h" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="Shaders\dissolving.frag" />
+    <None Include="Shaders\dissolving.vert" />
     <None Include="Shaders\phong.frag" />
     <None Include="Shaders\phong.vert" />
+    <None Include="Shaders\ramp.frag" />
+    <None Include="Shaders\ramp.vert" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

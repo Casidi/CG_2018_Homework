@@ -120,6 +120,11 @@ GLuint noiseTextureID; // TA has already loaded this texture for you
 GLuint rampTextureID; // TA has already loaded this texture for you
 
 GLuint phongProgramID;
+GLuint dissolvingProgramID;
+GLuint rampProgramID;
+GLuint currentProgramID;
+
+float dissolvingThresh = 0.0f;
 
 GLMmodel *model; //TA has already loaded the model for you(!but you still need to convert it to VBO(s)!)
 GLuint modelVAO;
@@ -231,6 +236,16 @@ void init(void)
 	GLuint vert = createShader("Shaders/phong.vert", "vertex");
 	GLuint frag = createShader("Shaders/phong.frag", "fragment");
 	phongProgramID = createProgram(vert, frag);
+
+	vert = createShader("Shaders/dissolving.vert", "vertex");
+	frag = createShader("Shaders/dissolving.frag", "fragment");
+	dissolvingProgramID = createProgram(vert, frag);
+
+	vert = createShader("Shaders/ramp.vert", "vertex");
+	frag = createShader("Shaders/ramp.frag", "fragment");
+	rampProgramID = createProgram(vert, frag);
+
+	currentProgramID = phongProgramID;
 }
 
 void display(void)
@@ -274,10 +289,14 @@ void display(void)
 			0.0,
 			1.0,
 			0.0);
-		glUseProgram(phongProgramID);
+
+		//currentProgramID = phongProgramID;
+		//currentProgramID = dissolvingProgramID;
+		glUseProgram(currentProgramID);
+
 		GLfloat mtx[16];
 		glGetFloatv(GL_MODELVIEW_MATRIX, mtx);
-		GLint loc = glGetUniformLocation(phongProgramID, "viewMatrix");
+		GLint loc = glGetUniformLocation(currentProgramID, "viewMatrix");
 		glUniformMatrix4fv(loc, 1, GL_FALSE, mtx);
 
 		glLoadIdentity();
@@ -286,19 +305,30 @@ void display(void)
 		glRotatef(ball_rot[1], 0, 1, 0);
 		glRotatef(ball_rot[2], 0, 0, 1);
 		glGetFloatv(GL_MODELVIEW_MATRIX, mtx);
-		loc = glGetUniformLocation(phongProgramID, "modelMatrix");
+		loc = glGetUniformLocation(currentProgramID, "modelMatrix");
 		glUniformMatrix4fv(loc, 1, GL_FALSE, mtx);
 
 		glGetFloatv(GL_PROJECTION_MATRIX, mtx);
-		loc = glGetUniformLocation(phongProgramID, "projectionMatrix");
+		loc = glGetUniformLocation(currentProgramID, "projectionMatrix");
 		glUniformMatrix4fv(loc, 1, GL_FALSE, mtx);
 
-		loc = glGetUniformLocation(phongProgramID, "myTexture");
+		loc = glGetUniformLocation(currentProgramID, "myTexture");
 		glUniform1i(loc, 0);
 
-		loc = glGetUniformLocation(phongProgramID, "lightPos");
+		if (currentProgramID == dissolvingProgramID) {
+			loc = glGetUniformLocation(currentProgramID, "noiseTexture");
+			glUniform1i(loc, 1);
+			loc = glGetUniformLocation(currentProgramID, "dissolvingThresh");
+			glUniform1f(loc, dissolvingThresh);
+		}
+		else if (currentProgramID == rampProgramID) {
+			loc = glGetUniformLocation(currentProgramID, "rampTexture");
+			glUniform1i(loc, 1);
+		}
+
+		loc = glGetUniformLocation(currentProgramID, "lightPos");
 		glUniform3fv(loc, 1, light_pos);
-		loc = glGetUniformLocation(phongProgramID, "viewPos");
+		loc = glGetUniformLocation(currentProgramID, "viewPos");
 		glUniform3f(loc, eyex, eyey, eyez);
 
 		glPopMatrix();
@@ -323,6 +353,17 @@ void keyboard(unsigned char key, int x, int y) {
 	case 'b'://toggle mode
 	{
 		//you may need to do somting here
+		if (currentProgramID == phongProgramID) {
+			currentProgramID = dissolvingProgramID;
+			dissolvingThresh = 0.0f;
+		}
+		else if (currentProgramID == dissolvingProgramID)
+			currentProgramID = rampProgramID;
+		else if (currentProgramID == rampProgramID)
+			currentProgramID = phongProgramID;
+		else
+			currentProgramID = phongProgramID;
+
 		break;
 	}
 	case 'd':
@@ -780,6 +821,11 @@ void keyboardup(unsigned char key, int x, int y)
 
 void idle(void)
 {
+	if (dissolvingThresh > 0.99f)
+		dissolvingThresh = 0.0f;
+	else
+		dissolvingThresh += 0.002;
+
 	glutPostRedisplay();
 }
 
@@ -789,7 +835,18 @@ GLuint loadTexture(char* name, GLfloat width, GLfloat height)
 }
 
 void myDrawModel() {
-	glBindTexture(GL_TEXTURE_2D, model->textures[0].id);
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, mainTextureID);
+
+	if (currentProgramID == dissolvingProgramID) {
+		glActiveTexture(GL_TEXTURE1);
+		glBindTexture(GL_TEXTURE_2D, noiseTextureID);
+	}
+	else if (currentProgramID == rampProgramID) {
+		glActiveTexture(GL_TEXTURE1);
+		glBindTexture(GL_TEXTURE_2D, rampTextureID);
+	}
+
 	glBindVertexArray(modelVAO);
 	glDrawArrays(GL_TRIANGLES, 0, modelVertexNum);
 	glBindVertexArray(0);
