@@ -33,8 +33,9 @@ void main() {
 	float attenuation = 1.0 / (1.0 + distance * distance);
 
 	vec3 result = ambient + diffuse + specular;
-	vec3 resultTextured = ((ambient + diffuse)*vec3(texture(myTexture, TexCoord)) + specular) * attenuation;
-	
+	vec3 resultTextured = ambient * vec3(texture(myTexture, TexCoord))
+							+ diffuse * vec3(texture(myTexture, TexCoord)) * attenuation 
+							+ specular * attenuation;
 
 	//FragColor = vec4(fragNormal, 1.0f);
 	//FragColor = texture(myTexture, TexCoord);

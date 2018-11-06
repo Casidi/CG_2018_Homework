@@ -108,7 +108,7 @@ namespace
 }
 
 // You can modify the moving/rotating speed if it's too fast/slow for you
-const float speed = 0.03; // camera / light / ball moving speed
+const float speed = 0.01; // camera / light / ball moving speed
 const float rotation_speed = 0.05; // ball rotating speed
 
 //you may need to use some of the following variables in your program 
@@ -125,6 +125,7 @@ GLuint rampProgramID;
 GLuint currentProgramID;
 
 float dissolvingThresh = 0.0f;
+bool isDessolvingIncreasing = true;
 
 GLMmodel *model; //TA has already loaded the model for you(!but you still need to convert it to VBO(s)!)
 GLuint modelVAO;
@@ -173,6 +174,17 @@ void init(void)
 
 	model = glmReadOBJ(obj_file_dir);
 
+	mainTextureID = loadTexture(main_tex_dir, 512, 256);
+	noiseTextureID = loadTexture(noise_tex_dir, 360, 360);
+	rampTextureID = loadTexture(ramp_tex_dir, 256, 256);
+	
+	glmUnitize(model);
+	glmFacetNormals(model);
+	glmVertexNormals(model, 90.0, GL_FALSE);
+	glEnable(GL_DEPTH_TEST);
+	print_model_info(model);
+
+	//you may need to do something here(create shaders/program(s) and create vbo(s)/vao from GLMmodel model)
 	GLMgroup *group = model->groups;
 	int numVertices = 0;
 	while (group) {
@@ -183,7 +195,7 @@ void init(void)
 
 	Vertex *allVertices = new Vertex[numVertices];
 	group = model->groups;
-	#define T(x) (model->triangles[(x)])
+#define T(x) (model->triangles[(x)])
 	while (group) {
 		for (int i = 0; i < group->numtriangles; ++i) {
 			GLMtriangle* triangle = &T(group->triangles[i]);
@@ -199,7 +211,7 @@ void init(void)
 		}
 		group = group->next;
 	}
-	
+
 	GLuint vbo_id;
 	glGenBuffers(1, &vbo_id);
 	glBindBuffer(GL_ARRAY_BUFFER, vbo_id);
@@ -217,18 +229,6 @@ void init(void)
 	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)0);
 	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)(3 * sizeof(GLfloat)));
 	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)(6 * sizeof(GLfloat)));
-
-	mainTextureID = loadTexture(main_tex_dir, 512, 256);
-	noiseTextureID = loadTexture(noise_tex_dir, 360, 360);
-	rampTextureID = loadTexture(ramp_tex_dir, 256, 256);
-	
-	glmUnitize(model);
-	glmFacetNormals(model);
-	glmVertexNormals(model, 90.0, GL_FALSE);
-	glEnable(GL_DEPTH_TEST);
-	print_model_info(model);
-
-	//you may need to do something here(create shaders/program(s) and create vbo(s)/vao from GLMmodel model)
 
 	// APIs for creating shaders and creating shader programs have been done by TAs
 	// following is an example for creating a shader program using given vertex shader and fragment shader
@@ -276,7 +276,6 @@ void display(void)
 	// please try not to modify the previous block of code
 
 	// you may need to do something here(pass uniform variable(s) to shader and render the model)
-		//glmDraw(model,GLM_TEXTURE);// please delete this line in your final code! It's just a preview of rendered object
 		glPushMatrix();
 		glLoadIdentity();
 		gluLookAt(
@@ -289,9 +288,6 @@ void display(void)
 			0.0,
 			1.0,
 			0.0);
-
-		//currentProgramID = phongProgramID;
-		//currentProgramID = dissolvingProgramID;
 		glUseProgram(currentProgramID);
 
 		GLfloat mtx[16];
@@ -335,7 +331,7 @@ void display(void)
 
 		myDrawModel();
 		glUseProgram(0);
-		glmDraw(model, GLM_TEXTURE);
+		//glmDraw(model, GLM_TEXTURE);
 
 	glPopMatrix();
 
@@ -821,10 +817,17 @@ void keyboardup(unsigned char key, int x, int y)
 
 void idle(void)
 {
-	if (dissolvingThresh > 0.99f)
-		dissolvingThresh = 0.0f;
+	float dissolvingStep = 0.001f;
+	if (isDessolvingIncreasing)
+		dissolvingThresh += dissolvingStep;
 	else
-		dissolvingThresh += 0.002;
+		dissolvingThresh -= dissolvingStep;
+
+	if (dissolvingThresh > 0.99f) {
+		isDessolvingIncreasing = false;
+	}
+	if (dissolvingThresh < 0)
+		isDessolvingIncreasing = true;
 
 	glutPostRedisplay();
 }
