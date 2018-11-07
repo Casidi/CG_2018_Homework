@@ -39,7 +39,9 @@ void main() {
 	vec3 result = ambient + diffuse + specular;
 	vec3 resultTextured = ((ambient + diffuse)*vec3(texture(myTexture, TexCoord)) + specular) * attenuation;
 	
-	float noise = texture(noiseTexture, TexCoord).x;
+	float noise = (texture(noiseTexture, TexCoord).x
+					+ texture(noiseTexture, TexCoord).y
+					+ texture(noiseTexture, TexCoord).z) / 3.0;
 	if (noise < dissolvingThresh)
 		discard;
 	else if (noise < dissolvingThresh + 0.03)

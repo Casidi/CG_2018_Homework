@@ -38,7 +38,7 @@ void main() {
 	vec3 specular = specularStrength * spec * lightColor;
 
 	float distance = length(lightPos - fragPos);
-	float attenuation = 1.0 / (1.0 + distance * distance);
+	float attenuation = 1.0 / (distance * distance);
 
 	vec3 result = ambient + diffuse + specular;
 	vec3 resultTextured = ambient * vec3(texture(myTexture, TexCoord))
