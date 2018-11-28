@@ -13,36 +13,39 @@ uniform vec3 lightPos;
 uniform vec3 viewPos;
 uniform float time;
 
+float linearize(float a) {
+	float n = 0.001;                                // the near plane
+	float f = 100.0;                               // the far plane
+	return (2.0 * n) / (f + n - a * (f - n));  // convert to linear values       
+}
+
+float checkIntersect(float a) {
+	a = linearize(a);
+	if(a > linearize(gl_FragCoord.z)) {
+		if (a - linearize(gl_FragCoord.z) < 0.01)
+			return 1.0 - 100 * (a - linearize(gl_FragCoord.z));
+		else
+			return 0.0;
+	} else {
+		return 0.0;
+	}
+}
+
 void main() {
-	vec4 baseColor = vec4(0.0, 0.0, 1.0, 1.0);
-	vec3 lightColor = vec3(1.0, 1.0, 1.0);
-
 	vec3 norm = normalize(fragNormal);
-	vec3 lightDir = normalize(lightPos - fragPos);
-
-	float ambientStrength = 0.2;
-	vec3 ambient = ambientStrength * lightColor;
-
-	float diffuseStrenth = 0.8;
-	float diff = max(dot(norm, lightDir), 0.0);
-	vec3 diffuse = diffuseStrenth * diff * lightColor;
-
-	float specularStrength = 0.5;
 	vec3 viewDir = normalize(viewPos - fragPos);
-	vec3 reflectDir = reflect(-lightDir, norm);
-	float spec = pow(max(dot(viewDir, reflectDir), 0.0), 100);
-	vec3 specular = specularStrength * spec * lightColor;
-
-	float distance = length(lightPos - fragPos);
-	float attenuation = 1.0 / (distance * distance);
-
-	vec3 resultTextured = ambient * vec3(texture(myTexture, TexCoord))
-							+ diffuse * vec3(texture(myTexture, TexCoord)) * attenuation 
-							+ specular * attenuation;
 	
 	float Pole = pow((fragPosLocal.y + 1.0)/2, 2);
 	float Rim = 1.0 - abs(dot(norm, viewDir));
 	float Intersect = 0.0;
+
+	vec4 northPole = vec4(vec3(Pole), 1.0);
+	vec4 rim = vec4(Rim, Rim, Rim, 1.0);
+
+	float raw = texture2D(depthTexture, gl_FragCoord.xy / 512.0).r;
+	float isIntersect = checkIntersect(raw);
+	vec4 intersect = vec4(isIntersect, isIntersect, isIntersect, 1);
+	Intersect = isIntersect;
 
 	vec4 _Color = vec4(16, 59, 159, 4) / 255.0;
     float glow = max(max(Intersect, Rim), Pole);
@@ -58,6 +61,10 @@ void main() {
 	//FragColor = vec4(fragNormal, 1.0f);
 	//FragColor = vec4(Rim);
 	FragColor = outColor;
-	//FragColor = texture(depthTexture, gl_FragCoord.xy);
-	//FragColor = vec4(resultTextured, 1.0);
+	//FragColor = vec4(vec3(linearize(texture(depthTexture, gl_FragCoord.xy / 512.0).r)), 1.0);
+	//FragColor = texture(myTexture, TexCoord);
+	//FragColor = vec4(vec3(gl_FragCoord.z), 1.0);
+
+	//if(raw > gl_FragCoord.z && raw - gl_FragCoord.z < 0.00003)
+	//	FragColor = vec4(1,0,0, 1);
 }

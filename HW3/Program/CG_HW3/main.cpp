@@ -98,6 +98,7 @@ GLuint modelProgram;
 
 GLuint depthFrameBuffer;
 GLuint depthTexture;
+GLuint renderedTexture;
 
 float eyex = 0.0;
 float eyey = 0.64;
@@ -150,7 +151,6 @@ int main(int argc, char *argv[])
 
 void init(void)
 {
-	GLuint renderedTexture;
 	glGenTextures(1, &renderedTexture);
 	glBindTexture(GL_TEXTURE_2D, renderedTexture);
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 512, 512, 0, GL_RGB, GL_UNSIGNED_BYTE, 0);
@@ -158,10 +158,14 @@ void init(void)
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 	glBindTexture(GL_TEXTURE_2D, 0);
 
-	
 	glGenTextures(1, &depthTexture);
 	glBindTexture(GL_TEXTURE_2D, depthTexture);
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT32, 512, 512, 0, GL_DEPTH_COMPONENT, GL_FLOAT, 0);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_NONE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 	glBindTexture(GL_TEXTURE_2D, 0);
 
 	glGenFramebuffers(1, &depthFrameBuffer);
@@ -324,6 +328,7 @@ void display(void)
 void renderDepthTexture() {
 	glBindFramebuffer(GL_FRAMEBUFFER, depthFrameBuffer);
 	glEnable(GL_DEPTH_TEST);
+	glDepthMask(GL_TRUE);
 
 	//glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -356,6 +361,7 @@ void renderDepthTexture() {
 	glEnd();
 	glPopMatrix();
 	glEnable(GL_CULL_FACE);
+
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
@@ -412,6 +418,7 @@ void myDrawModel() {
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, mainTextureID);
 	glActiveTexture(GL_TEXTURE1);
+	//glBindTexture(GL_TEXTURE_2D, renderedTexture);
 	glBindTexture(GL_TEXTURE_2D, depthTexture);
 
 	glBindVertexArray(modelVAO);
