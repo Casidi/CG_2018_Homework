@@ -35,12 +35,15 @@ void mouse(int button, int state, int x, int y);
 void idle(void);
 void camera_light_ball_move();
 GLuint loadTexture(char* name, GLfloat width, GLfloat height);
+void myDrawModel();
+void renderDepthTexture();
 
 namespace
 {
 	char *obj_file_dir = "../Resources/Ball.obj";
 	char *bunny_file_dir = "../Resources/bunny.obj";
 	char *teapot_file_dir = "../Resources/teapot.obj";
+	char *main_tex_dir = "../Resources/honey_comb_master.ppm";
 	
 	GLfloat light_rad = 0.05;//radius of the light bulb
 	float eyet = 0.0;//theta in degree
@@ -89,6 +92,12 @@ GLuint noiseTextureID; // TA has already loaded this texture for you
 GLuint rampTextureID; // TA has already loaded this texture for you
 
 GLMmodel *model, *bunnyModel, *teapotModel; //TA has already loaded the model for you(!but you still need to convert it to VBO(s)!)
+GLuint modelVAO;
+int modelVertexNum;
+GLuint modelProgram;
+
+GLuint depthFrameBuffer;
+GLuint depthTexture;
 
 float eyex = 0.0;
 float eyey = 0.64;
@@ -116,7 +125,7 @@ int main(int argc, char *argv[])
 
 	glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGBA | GLUT_DEPTH);
 	// remember to replace "YourStudentID" with your own student ID
-	glutCreateWindow("CG_HW3_YourStudentID");
+	glutCreateWindow("CG_HW3_0756025");
 	glutReshapeWindow(512, 512);
 
 	glewInit();
@@ -141,10 +150,35 @@ int main(int argc, char *argv[])
 
 void init(void)
 {
+	GLuint renderedTexture;
+	glGenTextures(1, &renderedTexture);
+	glBindTexture(GL_TEXTURE_2D, renderedTexture);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 512, 512, 0, GL_RGB, GL_UNSIGNED_BYTE, 0);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glBindTexture(GL_TEXTURE_2D, 0);
+
+	
+	glGenTextures(1, &depthTexture);
+	glBindTexture(GL_TEXTURE_2D, depthTexture);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT32, 512, 512, 0, GL_DEPTH_COMPONENT, GL_FLOAT, 0);
+	glBindTexture(GL_TEXTURE_2D, 0);
+
+	glGenFramebuffers(1, &depthFrameBuffer);
+	glBindFramebuffer(GL_FRAMEBUFFER, depthFrameBuffer);
+	glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, renderedTexture, 0);
+	glFramebufferTexture(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, depthTexture, 0);
+	if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+		printf("ERROR::FRAMEBUFFER:: Framebuffer is not complete!\n");
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
 	glEnable(GL_CULL_FACE);
 	model = glmReadOBJ(obj_file_dir);
+
+	float w, h;
+	mainTextureID = glmLoadTexture(main_tex_dir, true, true, true, true, &w, &h);
 	
 	glmUnitize(model);
 	glmFacetNormals(model);
@@ -169,22 +203,64 @@ void init(void)
 	print_model_info(teapotModel);
 
 	//you may need to do something here(create shaders/program(s) and create vbo(s)/vao from GLMmodel model)
+	GLMgroup *group = model->groups;
+	int numVertices = 0;
+	while (group) {
+		numVertices += group->numtriangles * 3;
+		group = group->next;
+	}
+	modelVertexNum = numVertices;
+
+	Vertex *allVertices = new Vertex[numVertices];
+	group = model->groups;
+#define T(x) (model->triangles[(x)])
+	while (group) {
+		for (int i = 0; i < group->numtriangles; ++i) {
+			GLMtriangle* triangle = &T(group->triangles[i]);
+			for (int j = 0; j < 3; ++j) {
+				for (int k = 0; k < 3; ++k) {
+					allVertices[i * 3 + j].position[k] = model->vertices[3 * triangle->vindices[j] + k];
+					allVertices[i * 3 + j].normal[k] = model->normals[3 * triangle->nindices[j] + k];
+				}
+				for (int k = 0; k < 2; ++k) {
+					allVertices[i * 3 + j].texcoord[k] = model->texcoords[2 * triangle->tindices[j] + k];
+				}
+			}
+		}
+		group = group->next;
+	}
+
+	GLuint vbo_id;
+	glGenBuffers(1, &vbo_id);
+	glBindBuffer(GL_ARRAY_BUFFER, vbo_id);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(Vertex)*numVertices, allVertices, GL_STATIC_DRAW);
+	delete[] allVertices;
+
+	glGenVertexArrays(1, &modelVAO);
+	glBindVertexArray(modelVAO);
+
+	glEnableVertexAttribArray(0);
+	glEnableVertexAttribArray(1);
+	glEnableVertexAttribArray(2);
+
+	glBindBuffer(GL_ARRAY_BUFFER, vbo_id);
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)0);
+	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)(3 * sizeof(GLfloat)));
+	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)(6 * sizeof(GLfloat)));
 
 	// APIs for creating shaders and creating shader programs have been done by TAs
 	// following is an example for creating a shader program using given vertex shader and fragment shader
-	/*
 	GLuint vert = createShader("Shaders/barrier.vert", "vertex");
 	GLuint frag = createShader("Shaders/barrier.frag", "fragment");
-	GLuint program = createProgram(vert, frag);
-	*/
+	modelProgram = createProgram(vert, frag);
 }
 
 void display(void)
 {
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
 	//you may need to do something here(declare some local variables you need and maybe load Model matrix here...)
+	renderDepthTexture();
 
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	// looping teapot and bunny
 	glPushMatrix();
 	glScalef(0.3, 0.3, 0.3);
@@ -236,12 +312,118 @@ void display(void)
 	// please try not to modify the previous block of code
 
 	// you may need to do something here(pass uniform variable(s) to shader and render the model)
-	glmDraw(model,GLM_TEXTURE);// please delete this line in your final code! It's just a preview of rendered object
+		myDrawModel();
+	//glmDraw(model,GLM_TEXTURE);// please delete this line in your final code! It's just a preview of rendered object
 
 	glPopMatrix();
 
 	glutSwapBuffers();
 	camera_light_ball_move();
+}
+
+void renderDepthTexture() {
+	glBindFramebuffer(GL_FRAMEBUFFER, depthFrameBuffer);
+	glEnable(GL_DEPTH_TEST);
+
+	//glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+	glPushMatrix();
+	glScalef(0.3, 0.3, 0.3);
+	glTranslatef(-2.1, 3.3 - fmod(time, 3), 1.3);
+	glmDraw(teapotModel, GLM_TEXTURE);
+	glPopMatrix();
+
+	glPushMatrix();
+	glScalef(0.3, 0.3, 0.3);
+	glTranslatef(2, 3.3 - fmod(time, 3), 1.4);
+	glmDraw(bunnyModel, GLM_TEXTURE);
+	glPopMatrix();
+
+	// floor
+	glDisable(GL_CULL_FACE);
+	glPushMatrix();
+	glScalef(30, 1, 30);
+	glTranslatef(0.0f, 0.0f, 0.0f);
+	glBegin(GL_TRIANGLE_STRIP);
+
+	glColor3f(1, 1, 1);
+	glVertex3f(1, -0.032, 1);
+	glVertex3f(1, -0.031, -1);
+	glVertex3f(-1, -0.032, 1);
+	glVertex3f(-1, -0.031, -1);
+
+	glEnd();
+	glPopMatrix();
+	glEnable(GL_CULL_FACE);
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
+void myDrawModel() {
+	glPushMatrix();
+	glLoadIdentity();
+	gluLookAt(
+		eyex,
+		eyey,
+		eyez,
+		eyex + cos(eyet*M_PI / 180)*cos(eyep*M_PI / 180),
+		eyey + sin(eyet*M_PI / 180),
+		eyez - cos(eyet*M_PI / 180)*sin(eyep*M_PI / 180),
+		0.0,
+		1.0,
+		0.0);
+	glUseProgram(modelProgram);
+
+	GLfloat mtx[16];
+	glGetFloatv(GL_MODELVIEW_MATRIX, mtx);
+	GLint loc = glGetUniformLocation(modelProgram, "viewMatrix");
+	glUniformMatrix4fv(loc, 1, GL_FALSE, mtx);
+
+	glLoadIdentity();
+	glTranslatef(ball_pos[0], ball_pos[1], ball_pos[2]);
+	glRotatef(ball_rot[0], 1, 0, 0);
+	glRotatef(ball_rot[1], 0, 1, 0);
+	glRotatef(ball_rot[2], 0, 0, 1);
+	glGetFloatv(GL_MODELVIEW_MATRIX, mtx);
+	loc = glGetUniformLocation(modelProgram, "modelMatrix");
+	glUniformMatrix4fv(loc, 1, GL_FALSE, mtx);
+
+	glGetFloatv(GL_PROJECTION_MATRIX, mtx);
+	loc = glGetUniformLocation(modelProgram, "projectionMatrix");
+	glUniformMatrix4fv(loc, 1, GL_FALSE, mtx);
+
+	loc = glGetUniformLocation(modelProgram, "myTexture");
+	glUniform1i(loc, 0);
+	loc = glGetUniformLocation(modelProgram, "depthTexture");
+	glUniform1i(loc, 1);
+	loc = glGetUniformLocation(modelProgram, "time");
+	glUniform1f(loc, time);
+
+	loc = glGetUniformLocation(modelProgram, "lightPos");
+	glUniform3fv(loc, 1, light_pos);
+	loc = glGetUniformLocation(modelProgram, "viewPos");
+	glUniform3f(loc, eyex, eyey, eyez);
+
+	glPopMatrix();
+
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, mainTextureID);
+	glActiveTexture(GL_TEXTURE1);
+	glBindTexture(GL_TEXTURE_2D, depthTexture);
+
+	glBindVertexArray(modelVAO);
+	glDrawArrays(GL_TRIANGLES, 0, modelVertexNum);
+	glBindVertexArray(0);
+
+	glActiveTexture(GL_TEXTURE1);
+	glBindTexture(GL_TEXTURE_2D, 0);
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, 0);
+
+	glUseProgram(0);
 }
 
 //please implement mode toggle(switch mode between phongShading/Dissolving/Ramp) in case 'b'(lowercase)
