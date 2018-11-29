@@ -21,9 +21,10 @@ float linearize(float a) {
 
 float checkIntersect(float a) {
 	a = linearize(a);
-	if(a > linearize(gl_FragCoord.z)) {
-		if (a - linearize(gl_FragCoord.z) < 0.01)
-			return 1.0 - 100 * (a - linearize(gl_FragCoord.z));
+	float currentDepth = linearize(gl_FragCoord.z);
+	if(a > currentDepth) {
+		if (a - currentDepth < 0.01)
+			return 1.0 - 100 * (a - currentDepth);
 		else
 			return 0.0;
 	} else {
