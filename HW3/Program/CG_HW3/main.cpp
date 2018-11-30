@@ -366,6 +366,9 @@ void renderDepthTexture() {
 }
 
 void myDrawModel() {
+	glDisable(GL_DEPTH_TEST);
+	glDisable(GL_CULL_FACE);
+
 	glPushMatrix();
 	glLoadIdentity();
 	gluLookAt(
@@ -418,7 +421,6 @@ void myDrawModel() {
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, mainTextureID);
 	glActiveTexture(GL_TEXTURE1);
-	//glBindTexture(GL_TEXTURE_2D, renderedTexture);
 	glBindTexture(GL_TEXTURE_2D, depthTexture);
 
 	glBindVertexArray(modelVAO);
@@ -431,6 +433,8 @@ void myDrawModel() {
 	glBindTexture(GL_TEXTURE_2D, 0);
 
 	glUseProgram(0);
+	glEnable(GL_DEPTH_TEST);
+	glEnable(GL_CULL_FACE);
 }
 
 //please implement mode toggle(switch mode between phongShading/Dissolving/Ramp) in case 'b'(lowercase)

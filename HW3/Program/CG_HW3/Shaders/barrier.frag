@@ -35,17 +35,13 @@ void main() {
 	vec3 norm = normalize(fragNormal);
 	vec3 viewDir = normalize(viewPos - fragPos);
 	
+	float raw = texture2D(depthTexture, gl_FragCoord.xy / 512.0).r;
+	if (gl_FragCoord.z > raw)
+		discard;
+
 	float Pole = pow((fragPosLocal.y + 1.0)/2, 2);
 	float Rim = 1.0 - abs(dot(norm, viewDir));
-	float Intersect = 0.0;
-
-	vec4 northPole = vec4(vec3(Pole), 1.0);
-	vec4 rim = vec4(Rim, Rim, Rim, 1.0);
-
-	float raw = texture2D(depthTexture, gl_FragCoord.xy / 512.0).r;
-	float isIntersect = checkIntersect(raw);
-	vec4 intersect = vec4(isIntersect, isIntersect, isIntersect, 1);
-	Intersect = isIntersect;
+	float Intersect = checkIntersect(raw);	
 
 	vec4 _Color = vec4(16, 59, 159, 4) / 255.0;
     float glow = max(max(Intersect, Rim), Pole);
