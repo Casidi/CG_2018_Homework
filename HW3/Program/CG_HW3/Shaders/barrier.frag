@@ -1,4 +1,4 @@
-﻿#version 400 core
+#version 400 core
 
 in vec3 fragNormal;
 in vec2 TexCoord;
@@ -53,7 +53,7 @@ void main() {
 
 	vec2 mainUV = vec2(TexCoord.x * 5, TexCoord.y * 9);
 	vec4 mainTex = texture2D(myTexture, mainUV);
-	float multiplier = sin(fragPosLocal.y*6 + time*4);
+	float multiplier = (sin(fragPosLocal.y*6 + time*4) + 1.0) / 2.0;
 	vec4 pulsedTexColor  = multiplier * mainTex * _Color;
 
 	vec4 outColor = pulsedTexColor + glowColor;
